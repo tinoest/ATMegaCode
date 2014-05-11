@@ -4,11 +4,8 @@
 #define MYNODE  30            // Reciever ID
 #define FREQ    RF12_433MHZ   // Frequency
 #define GROUP   210           // Group
-#define BAUD    9600          // Serial Baud Rate
-
-//#define DEBUG  
-
-char xml[100];
+#define BAUDRATE 9600
+#define BAUD_PRESCALLER (((F_CPU / (BAUDRATE * 16UL))) - 1)
 
 typedef struct {
   uint16_t rxD;              // sensor value
@@ -30,15 +27,15 @@ unsigned long counter;
 
 void setup () {
 
-  Serial.begin(BAUD);
+  usart_init();
+  fdevopen( &ustart_putc, 0);
+  
   rf12_initialize(MYNODE,FREQ,GROUP); // Initialise the RFM12B
   dht.begin();
   lastTime = millis();
 
   // Baud Rate = b , Node = n , Group = g , Freq = f , SW = Software Version
-  memset(xml, 0, sizeof(xml));
-  sprintf(xml ,"<xml><b>%i</b><n>%i</n><f>%i</f><g>%i</g><sw>0.02</sw></xml>", BAUD , MYNODE , FREQ , GROUP );
-  Serial.println(xml);
+  printf_P(PSTR("<xml><b>%i</b><n>%i</n><f>%i</f><g>%i</g><sw>0.02</sw></xml>\n"), BAUDRATE , MYNODE , FREQ , GROUP );
 
 }
 
@@ -54,14 +51,10 @@ void loop() {
     if (RF12_WANTS_ACK) {                  // Send ACK if requested
       rf12_sendStart(RF12_ACK_REPLY, 0, 0);
 
-#if defined(DEBUG)
-      Serial.println("-> ack sent");
-#endif
     }
 
-    memset(xml, 0, sizeof(xml));
-    sprintf(xml ,"<xml><n>%i</n><c>%i</c><tmpr>%i</tmpr><v>%i</v></xml>", nodeID , value , tmpC , mV );
-    Serial.println(xml);
+    printf_P(PSTR("<xml><n>%i</n><c>%i</c><tmpr>%i</tmpr><v>%i</v></xml>\n"), nodeID , value , tmpC , mV );
+
   }
 
   if(((millis() - lastTime) > 30000) || ((millis() - lastTime) < 0)) { 
@@ -70,9 +63,7 @@ void loop() {
     int16_t humidty = (int16_t)dht.readHumidity();
     int16_t tmpC    = (int16_t)dht.readTemperature();
     uint16_t mV     = readVcc();
-    memset(xml, 0, sizeof(xml));
-    sprintf(xml ,"<xml><n>%i</n><c>%lu</c><tmpr>%i</tmpr><h>%i</h><v>%i</v></xml>", MYNODE , counter , tmpC , humidty , mV );
-    Serial.println(xml);   
+    printf_P(PSTR("<xml><n>%i</n><c>%lu</c><tmpr>%i</tmpr><h>%i</h><v>%i</v></xml>\n"), MYNODE , counter , tmpC , humidty , mV );  
   }
 
 }
@@ -90,6 +81,22 @@ long readVcc() {
   return result;
 }
 
+void usart_init() {
+
+  UBRR0H = (uint8_t)(BAUD_PRESCALLER>>8);
+  UBRR0L = (uint8_t)(BAUD_PRESCALLER);
+  UCSR0B = (1<<RXEN0)|(1<<TXEN0);
+  UCSR0C = ((1<<UCSZ00)|(1<<UCSZ01));
+
+}
+
+int ustart_putc( char data, FILE *t) 
+{
+  while(!(UCSR0A & (1<<UDRE0)));
+  UDR0 = data;
+
+  return 0;
+}
 
 
 
