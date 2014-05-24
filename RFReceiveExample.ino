@@ -7,6 +7,10 @@
 #define BAUDRATE 9600
 #define BAUD_PRESCALLER (((F_CPU / (BAUDRATE * 16UL))) - 1)
 
+long readVcc();
+void usart_init();
+int usart_putc( char data, FILE *t);
+
 typedef struct {
   uint16_t rxD;              // sensor value
   uint16_t tmpC;
@@ -28,7 +32,7 @@ unsigned long counter;
 void setup () {
 
   usart_init();
-  fdevopen( &ustart_putc, 0);
+  fdevopen( &usart_putc, 0);
   
   rf12_initialize(MYNODE,FREQ,GROUP); // Initialise the RFM12B
   dht.begin();
@@ -90,7 +94,7 @@ void usart_init() {
 
 }
 
-int ustart_putc( char data, FILE *t) 
+int usart_putc( char data, FILE *t) 
 {
   while(!(UCSR0A & (1<<UDRE0)));
   UDR0 = data;
